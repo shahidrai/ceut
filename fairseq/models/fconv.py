@@ -1,4 +1,23 @@
- 
+ """
+    Convolutional English to Urdu Translation from `"English to Urdu: Optimizing Sequence Learning in Neural Machine Translation" Please 
+    fallow the setting to train the model for English to Urdu dataset Tanzil http://opus.nlpl.eu/Tanzil.php
+    
+    !mkdir -p checkpoints/urdu/Eng_urdu_model
+!CUDA_VISIBLE_DEVICES=0 python train.py dataload/dataurdu \
+    --log-interval 100 --no-progress-bar \
+    --max-update 30000  --optimizer adam \
+    --adam-betas '(0.9, 0.98)' --lr-scheduler inverse_sqrt \
+    --clip-norm 0.0 --weight-decay 0.0 \
+    --criterion label_smoothed_cross_entropy --label-smoothing 0.1 \
+    --min-lr 1e-09 --update-freq 16  --keep-last-epochs 10 \
+    --ddp-backend=no_c10d --max-tokens 3500 \
+    --lr-scheduler cosine --warmup-init-lr 1e-7 --warmup-updates 10000 \
+    --lr-shrink 1 --max-lr 0.01 --lr 1e-7 --min-lr 1e-9 --warmup-init-lr 1e-07 \
+    --t-mult 1 --lr-period-updates 20000 --no-epoch-checkpoints \
+    --arch conv_eng_urdu --save-dir checkpoints/urdu/Eng_urdu_model \
+    --dropout 0.1
+    
+    """
 
 import math
 import torch
@@ -602,14 +621,14 @@ def Embedding(num_embeddings, embedding_dim, padding_idx):
     nn.init.constant_(m.weight[padding_idx], 0)
     return m
 
-
+#Layer store the word and its position in sentense two separate vectors
 def PositionalEmbedding(num_embeddings, embedding_dim, padding_idx):
     m = LearnedPositionalEmbedding(num_embeddings, embedding_dim, padding_idx)
     nn.init.normal_(m.weight, 0, 0.1)
     nn.init.constant_(m.weight[padding_idx], 0)
     return m
 
-
+#CEUT using linear fully connected linear for both encoder and decoder 
 def Linear(in_features, out_features, dropout=0):
     """Weight-normalized Linear layer (input: N x T x C)"""
     m = nn.Linear(in_features, out_features)
@@ -617,7 +636,7 @@ def Linear(in_features, out_features, dropout=0):
     nn.init.constant_(m.bias, 0)
     return nn.utils.weight_norm(m)
 
-
+# Convolutional block for decoder
 def LinearizedConv1d(in_channels, out_channels, kernel_size, dropout=0, **kwargs):
     """Weight-normalized Conv1d layer optimized for decoding"""
     m = LinearizedConvolution(in_channels, out_channels, kernel_size, **kwargs)
@@ -626,7 +645,7 @@ def LinearizedConv1d(in_channels, out_channels, kernel_size, dropout=0, **kwargs
     nn.init.constant_(m.bias, 0)
     return nn.utils.weight_norm(m, dim=2)
 
-
+#convolutional block for encoder
 def ConvTBC(in_channels, out_channels, kernel_size, dropout=0, **kwargs):
     """Weight-normalized Conv1d layer"""
     from fairseq.modules import ConvTBC
@@ -637,7 +656,7 @@ def ConvTBC(in_channels, out_channels, kernel_size, dropout=0, **kwargs):
     return nn.utils.weight_norm(m, dim=2)
 
 
-
+# Convolutional English to Urdu Translation model use fallowing configuration when dataset is small.
 @register_model_architecture('fconv', 'fconv')
 def base_architecture(args):
     args.dropout = getattr(args, 'dropout', 0.1)
@@ -652,7 +671,9 @@ def base_architecture(args):
     args.share_input_output_embed = getattr(args, 'share_input_output_embed', False)
 
 
-    
+#CEUT model shows execellent results with given encoder and decoder embedding size when dataset is large.
+#encoder using embedding size 768, kernal size 3 and 4 layers 
+#decoder using embedding size 768, kernal size 3 and 3 layers
 @register_model_architecture('fconv', 'conv_eng_urdu')
 def conv_eng_urdu(args):
     args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 768)
